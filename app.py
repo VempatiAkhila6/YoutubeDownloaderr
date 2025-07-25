@@ -4,6 +4,7 @@ import os
 import ssl
 import threading
 import time
+import glob
 
 app = Flask(__name__)
 
@@ -51,13 +52,14 @@ def download():
         'outtmpl': 'downloads/output.%(ext)s',
         'noplaylist': True,
         'progress_hooks': [download_progress_hook],
+        'ffmpeg_location': '/usr/bin/ffmpeg',  # Render's FFmpeg path
     }
 
     if format_type == 'mp4':
-        options['format'] = f'bestvideo[height<={resolution}]+bestaudio/best'
+        options['format'] = f'bestvideo[height<={resolution}]+bestaudio/best[height<={resolution}]'
         options['postprocessors'] = [{
-            'key': 'FFmpegVideoConvertor',
-            'preferredformat': 'mp4',
+            'key': 'FFmpegVideoRemuxer',
+            'preferedformat': 'mp4',  # Corrected for MP4 remuxing
         }]
     else:  # mp3
         options['format'] = 'bestaudio/best'
@@ -89,7 +91,12 @@ def download_file():
         format_type = request.args.get('format', 'mp4')
         file_path = f"downloads/output.{format_type}"
         if os.path.exists(file_path):
-            return send_file(file_path, as_attachment=True)
+            response = send_file(file_path, as_attachment=True)
+            # Cleanup files older than 1 hour
+            for file in glob.glob("downloads/output.*"):
+                if os.path.getmtime(file) < time.time() - 3600:
+                    os.remove(file)
+            return response
         else:
             return jsonify({"error": "File not found"}), 404
     return jsonify({"error": "Download not complete"}), 400
