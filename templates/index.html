@@ -31,6 +31,7 @@
             </div>
             <button type="submit" id="download-btn" class="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700">Download</button>
         </form>
+        <p id="title" class="mt-4 text-center text-sm text-gray-700"></p>
         <div id="progress" class="mt-4 hidden">
             <div class="w-full bg-gray-200 rounded-full h-2.5">
                 <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
@@ -49,12 +50,14 @@
         const progressBar = document.getElementById('progress-bar');
         const progressText = document.getElementById('progress-text');
         const downloadBtn = document.getElementById('download-btn');
+        const title = document.getElementById('title');
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             downloadBtn.disabled = true;
-            status.textContent = 'Starting download...';
-            progress.classList.remove('hidden');
+            status.textContent = 'Checking video availability...';
+            title.textContent = '';
+            progress.classList.add('hidden');
             status.classList.remove('text-red-600', 'text-green-600');
 
             const formData = new FormData(form);
@@ -72,12 +75,14 @@
                 if (result.error) {
                     status.textContent = `Error: ${result.error}`;
                     status.classList.add('text-red-600');
-                    progress.classList.add('hidden');
                     downloadBtn.disabled = false;
                     return;
                 }
 
-                // Poll progress
+                title.textContent = `Downloading: ${result.title}`;
+                status.textContent = 'Starting download...';
+                progress.classList.remove('hidden');
+
                 const pollProgress = setInterval(async () => {
                     try {
                         const progressResponse = await fetch('/progress');
