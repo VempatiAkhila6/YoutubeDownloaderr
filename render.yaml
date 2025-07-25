@@ -5,8 +5,9 @@ services:
        branch: main
        buildCommand: |
          apt-get update && apt-get install -y ffmpeg
+         pip install --upgrade pip
          pip install -r requirements.txt
        startCommand: gunicorn app:app
        envVars:
          - key: PYTHON_VERSION
-           value: 3.8.1
+           value: 3.10.12
