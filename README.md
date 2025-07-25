@@ -35,6 +35,7 @@ Contributing
 Fork this repository and submit pull requests to improve the tool!
 Troubleshooting
 
-Deployment Errors: Check Render logs for details. Ensure requirements.txt exists and PYTHON_VERSION is set to 3.10.12.
+Deployment Errors: Ensure requirements.txt has one dependency per line and PYTHON_VERSION is set to 3.10.12.
 FFmpeg Issues: Verify FFmpeg is installed (ffmpeg -version) and the path is correct in app.py or YOU.py.
+Spin-Down Delays: The free tier may delay first access by ~50 seconds. Consider a paid plan for better performance.
 Report issues via GitHub Issues.
