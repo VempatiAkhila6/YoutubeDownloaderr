@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.DEBUG)
 ssl._create_default_https_context = ssl._create_unverified_context
 
 # Global variables for progress tracking
-download_progress = {"percentage": 0, "status": "", "error": ""}
+download_progress = {"percentage": 0, "status": "", "error": "", "title": ""}
 
 def download_progress_hook(d):
     global download_progress
@@ -39,8 +39,8 @@ def index():
 @app.route('/download', methods=['POST'])
 def download():
     global download_progress
-    download_progress = {"percentage": 0, "status": "", "error": ""}
-    
+    download_progress = {"percentage": 0, "status": "", "error": "", "title": ""}
+
     try:
         url = request.form.get('url')
         format_type = request.form.get('format')
@@ -49,6 +49,20 @@ def download():
         if not url:
             download_progress['error'] = 'No URL provided'
             app.logger.error('No URL provided in download request')
+            return jsonify(download_progress), 400
+
+        # Check video availability and extract title
+        try:
+            with yt_dlp.YoutubeDL({'quiet': True, 'no_warnings': True}) as ydl:
+                info = ydl.extract_info(url, download=False)
+                if not info or info.get('is_private') or info.get('availability') == 'private':
+                    download_progress['error'] = 'Video is unavailable, private, or restricted in your region'
+                    app.logger.error(f'Video unavailable: {url}')
+                    return jsonify(download_progress), 400
+                download_progress['title'] = info.get('title', 'Unknown Title')
+        except Exception as e:
+            download_progress['error'] = 'Video is unavailable, private, or restricted in your region'
+            app.logger.error(f'Video availability check failed: {url}, error: {str(e)}')
             return jsonify(download_progress), 400
 
         output_file = f"downloads/output.{format_type}"
@@ -82,15 +96,16 @@ def download():
                     ydl.download([url])
             except Exception as e:
                 app.logger.error(f"Download error: {str(e)}")
-                download_progress['error'] = str(e)
+                download_progress['error'] = 'Video is unavailable or download failed: ' + str(e)
 
         threading.Thread(target=download_thread, daemon=True).start()
-        app.logger.info(f"Started download for URL: {url}, format: {format_type}")
-        return jsonify({"status": "started"}), 200
+        app.logger.info(f"Started download for URL: {url}, format: {format_type}, title: {download_progress['title']}")
+        return jsonify({"status": "started", "title": download_progress['title']}), 200
 
     except Exception as e:
         app.logger.error(f"Unexpected error in /download: {str(e)}")
-        return jsonify({"error": f"Server error: {str(e)}"}), 500
+        download_progress['error'] = f"Server error: {str(e)}"
+        return jsonify(download_progress), 500
 
 @app.route('/progress')
 def progress():
@@ -117,7 +132,6 @@ def download_file():
             return jsonify({"error": "File not found"}), 404
 
         response = send_file(file_path, as_attachment=True)
-        # Cleanup files older than 1 hour
         for file in glob.glob("downloads/output.*"):
             if os.path.getmtime(file) < time.time() - 3600:
                 os.remove(file)
