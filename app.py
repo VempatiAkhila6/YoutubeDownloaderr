@@ -8,11 +8,15 @@ import logging
 app = Flask(__name__)
 ssl._create_default_https_context = ssl._create_unverified_context
 
-# Set up logging
 logging.basicConfig(level=logging.INFO)
 
-# Track download progress globally
-download_progress = {"percentage": 0, "status": "", "error": "", "title": ""}
+# Shared progress dictionary
+download_progress = {
+    "percentage": 0,
+    "status": "Idle",
+    "error": "",
+    "title": ""
+}
 
 def progress_hook(d):
     if d['status'] == 'downloading':
@@ -23,7 +27,7 @@ def progress_hook(d):
         except ValueError:
             download_progress['percentage'] = 0
     elif d['status'] == 'finished':
-        download_progress['status'] = 'Downloaded'
+        download_progress['status'] = 'Processing'
         download_progress['percentage'] = 100
 
 @app.route('/')
@@ -33,7 +37,12 @@ def home():
 @app.route('/download', methods=['POST'])
 def download():
     global download_progress
-    download_progress = {"percentage": 0, "status": "", "error": "", "title": ""}
+    download_progress = {
+        "percentage": 0,
+        "status": "Starting",
+        "error": "",
+        "title": ""
+    }
 
     url = request.form.get('url')
     format_type = request.form.get('format', 'mp4')
@@ -42,48 +51,47 @@ def download():
     if not url:
         return jsonify({"error": "No URL provided"}), 400
 
-    os.makedirs('downloads', exist_ok=True)
     output_file = f"downloads/output.{format_type}"
+    os.makedirs('downloads', exist_ok=True)
     if os.path.exists(output_file):
         os.remove(output_file)
 
-    # yt-dlp options
     options = {
-        'cookies': 'cookies.txt',  # Make sure cookies.txt is in the app root or provide full path
+        'cookies': 'cookies.txt',  # make sure cookies.txt is in project root or adjust path
         'outtmpl': output_file,
         'noplaylist': True,
         'progress_hooks': [progress_hook],
         'quiet': True,
         'no_warnings': True,
-        # 'ffmpeg_location': '/usr/bin/ffmpeg',  # Uncomment if needed and ffmpeg is not in PATH
+        # 'ffmpeg_location': '/usr/bin/ffmpeg',  # Optional: comment out if ffmpeg is in PATH
     }
 
     if format_type == 'mp4':
         options['format'] = f'bestvideo[height<={resolution}]+bestaudio/best[height<={resolution}]'
-        options['postprocessors'] = [
-            {'key': 'FFmpegVideoRemuxer', 'preferedformat': 'mp4'}  # Note 'preferedformat' spelling!
-        ]
-    else:  # mp3
+        options['postprocessors'] = [{'key': 'FFmpegVideoRemuxer', 'preferedformat': 'mp4'}]
+    else:
         options['format'] = 'bestaudio'
-        options['postprocessors'] = [
-            {
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192'
-            }
-        ]
+        options['postprocessors'] = [{
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+            'preferredquality': '192'
+        }]
 
     def download_thread():
         try:
             with yt_dlp.YoutubeDL(options) as ydl:
                 info = ydl.extract_info(url, download=True)
                 download_progress['title'] = info.get('title', 'Downloaded File')
+                download_progress['status'] = 'Completed'
+                download_progress['percentage'] = 100
         except Exception as e:
             logging.error(f"Download failed: {e}")
             download_progress['error'] = str(e)
+            download_progress['status'] = 'Failed'
 
     threading.Thread(target=download_thread, daemon=True).start()
-    return jsonify({"status": "started"}), 200
+
+    return jsonify({"status": "started"})
 
 @app.route('/progress')
 def progress():
