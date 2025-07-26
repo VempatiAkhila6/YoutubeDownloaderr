@@ -2,131 +2,71 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>YouTube Downloader</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen">
-    <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
-        <h1 class="text-2xl font-bold text-center mb-4">YouTube Downloader</h1>
+    <div class="bg-white p-6 rounded-lg shadow w-full max-w-md">
+        <h1 class="text-xl font-bold mb-4 text-center">YouTube Downloader</h1>
         <form id="download-form" class="space-y-4">
-            <div>
-                <label for="url" class="block text-sm font-medium text-gray-700">YouTube URL:</label>
-                <input type="text" id="url" name="url" class="mt-1 block w-full p-2 border border-gray-300 rounded-md" placeholder="https://www.youtube.com/watch?v=..." required>
-            </div>
-            <div>
-                <label for="format" class="block text-sm font-medium text-gray-700">Format:</label>
-                <select id="format" name="format" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
-                    <option value="mp4">MP4 (Video)</option>
-                    <option value="mp3">MP3 (Audio)</option>
-                </select>
-            </div>
-            <div>
-                <label for="resolution" class="block text-sm font-medium text-gray-700">Resolution (for MP4):</label>
-                <select id="resolution" name="resolution" class="mt-1 block w-full p-2 border border-gray-300 rounded-md">
-                    <option value="720p">720p</option>
-                    <option value="360p">360p</option>
-                    <option value="240p">240p</option>
-                </select>
-            </div>
-            <button type="submit" id="download-btn" class="w-full bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700">Download</button>
+            <input type="text" name="url" placeholder="YouTube URL" class="w-full p-2 border rounded" required />
+            <select name="format" class="w-full p-2 border rounded">
+                <option value="mp4">MP4 (Video)</option>
+                <option value="mp3">MP3 (Audio)</option>
+            </select>
+            <select name="resolution" class="w-full p-2 border rounded">
+                <option value="720p">720p</option>
+                <option value="360p">360p</option>
+                <option value="240p">240p</option>
+            </select>
+            <button type="submit" class="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700">Start Download</button>
         </form>
-        <p id="title" class="mt-4 text-center text-sm text-gray-700"></p>
-        <div id="progress" class="mt-4 hidden">
-            <div class="w-full bg-gray-200 rounded-full h-2.5">
-                <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+        <div class="mt-4">
+            <div class="bg-gray-200 rounded h-2.5">
+                <div id="progress-bar" class="bg-blue-600 h-2.5 rounded" style="width: 0%"></div>
             </div>
-            <p id="progress-text" class="text-center text-sm mt-2">0%</p>
+            <p id="progress-text" class="text-sm text-center mt-1">0%</p>
         </div>
-        <p id="status" class="mt-4 text-center text-sm"></p>
-        <p class="mt-4 text-center text-sm text-gray-600">
-            Note: Use this tool responsibly and respect YouTube’s Terms of Service. Downloading copyrighted content without permission may violate laws.
-        </p>
+        <p id="status" class="text-sm text-center mt-4"></p>
     </div>
+
     <script>
         const form = document.getElementById('download-form');
-        const status = document.getElementById('status');
-        const progress = document.getElementById('progress');
         const progressBar = document.getElementById('progress-bar');
         const progressText = document.getElementById('progress-text');
-        const downloadBtn = document.getElementById('download-btn');
-        const title = document.getElementById('title');
+        const statusText = document.getElementById('status');
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            downloadBtn.disabled = true;
-            status.textContent = 'Checking video availability...';
-            title.textContent = '';
-            progress.classList.add('hidden');
-            status.classList.remove('text-red-600', 'text-green-600');
-
+            statusText.textContent = "Starting download...";
             const formData = new FormData(form);
-            try {
-                const response = await fetch('/download', {
-                    method: 'POST',
-                    body: formData
-                });
-                if (!response.ok) {
-                    throw new Error(`HTTP error! Status: ${response.status}`);
-                }
-                const result = await response.json();
-                console.log('Download response:', result);
+            const format = formData.get('format');
 
-                if (result.error) {
-                    status.textContent = `Error: ${result.error}`;
-                    status.classList.add('text-red-600');
-                    downloadBtn.disabled = false;
-                    return;
-                }
-
-                title.textContent = `Downloading: ${result.title}`;
-                status.textContent = 'Starting download...';
-                progress.classList.remove('hidden');
-
-                const pollProgress = setInterval(async () => {
-                    try {
-                        const progressResponse = await fetch('/progress');
-                        if (!progressResponse.ok) {
-                            throw new Error(`HTTP error! Status: ${progressResponse.status}`);
-                        }
-                        const progressData = await progressResponse.json();
-                        console.log('Progress data:', progressData);
-
-                        progressBar.style.width = `${progressData.percentage}%`;
-                        progressText.textContent = `${progressData.percentage}%`;
-
-                        if (progressData.error) {
-                            status.textContent = `Error: ${progressData.error}`;
-                            status.classList.add('text-red-600');
-                            progress.classList.add('hidden');
-                            clearInterval(pollProgress);
-                            downloadBtn.disabled = false;
-                        } else if (progressData.status === 'Downloaded') {
-                            status.textContent = 'Download complete! Starting file download...';
-                            status.classList.add('text-green-600');
-                            progress.classList.add('hidden');
-                            clearInterval(pollProgress);
-
-                            const format = formData.get('format');
-                            window.location.href = `/download_file?format=${format}`;
-                            downloadBtn.disabled = false;
-                        }
-                    } catch (error) {
-                        console.error('Progress error:', error);
-                        status.textContent = `Error: ${error.message}`;
-                        status.classList.add('text-red-600');
-                        progress.classList.add('hidden');
-                        clearInterval(pollProgress);
-                        downloadBtn.disabled = false;
-                    }
-                }, 1000);
-            } catch (error) {
-                console.error('Download error:', error);
-                status.textContent = `Error: ${error.message}`;
-                status.classList.add('text-red-600');
-                progress.classList.add('hidden');
-                downloadBtn.disabled = false;
+            const res = await fetch('/download', { method: 'POST', body: formData });
+            if (!res.ok) {
+                const err = await res.json();
+                statusText.textContent = `Error: ${err.error || res.status}`;
+                return;
             }
+
+            const interval = setInterval(async () => {
+                const res = await fetch('/progress');
+                const data = await res.json();
+
+                progressBar.style.width = `${data.percentage}%`;
+                progressText.textContent = `${data.percentage}%`;
+
+                if (data.error) {
+                    clearInterval(interval);
+                    statusText.textContent = `Error: ${data.error}`;
+                }
+
+                if (data.status === 'Downloaded') {
+                    clearInterval(interval);
+                    statusText.textContent = 'Download complete. Saving file...';
+                    window.location.href = `/download_file?format=${format}`;
+                }
+            }, 1000);
         });
     </script>
 </body>
