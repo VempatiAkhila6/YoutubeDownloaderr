@@ -2,12 +2,12 @@ import os
 import logging
 import time
 import glob
-import threading import Thread
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, render_template
 from flask_cors import CORS
 import yt_dlp
 import ssl
 from datetime import timedelta
+from threading import Thread
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend-backend communication
@@ -83,6 +83,7 @@ def download():
         resolution = request.form.get('resolution', '720p').replace('p', '')
 
         if not url:
+            progress_store[session_id]['error'] = 'No URL provided'
             return jsonify({"error": "No URL provided", "session_id": session_id}), 400
 
         # Check video availability
