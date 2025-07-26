@@ -9,6 +9,6 @@ services:
     startCommand: gunicorn main:app
     envVars:
       - key: PYTHON_VERSION
-        value: 3.10
+        value: 3.10.12  # Specify a full version (major.minor.patch)
       - key: COOKIES_DATA
-        sync: false  # Set this manually in Render dashboard if needed
+        sync: false  # Optional; set manually in Render dashboard if needed
