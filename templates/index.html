@@ -42,7 +42,7 @@
                 </select>
             </div>
             <button type="submit" id="download-btn" class="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700 disabled:bg-gray-400 flex items-center justify-center space-x-2" aria-label="Start download">
-                <span>Start Download</span>
+                <span>Download</span>
             </button>
         </form>
         <div id="progress-section" class="mt-4 hidden">
@@ -56,7 +56,6 @@
             Use this tool responsibly. Ensure you have permission to download content. Comply with YouTube's <a href="https://www.youtube.com/t/terms" class="underline" target="_blank">Terms of Service</a>.
         </p>
     </div>
-
     <script>
         const form = document.getElementById('download-form');
         const urlInput = document.getElementById('url');
@@ -73,23 +72,19 @@
         const progressText = document.getElementById('progress-text');
         const statusText = document.getElementById('status');
 
-        // Toggle resolution section based on format
         formatSelect.addEventListener('change', () => {
             resolutionSection.classList.toggle('hidden', formatSelect.value === 'mp3');
         });
 
-        // Validate URL and fetch video info
         urlInput.addEventListener('input', async () => {
             const url = urlInput.value.trim();
             urlError.classList.add('hidden');
             videoInfo.classList.add('hidden');
-
             if (!url || !/^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//.test(url)) {
-                urlError.textContent = 'Please enter a valid YouTube URL';
+                urlError.textContent = 'Please enter a valid YouTube URL (e.g., https://www.youtube.com/watch?v=...)';
                 urlError.classList.remove('hidden');
                 return;
             }
-
             try {
                 const res = await fetch('/video_info', {
                     method: 'POST',
@@ -104,10 +99,10 @@
                 }
                 title.textContent = data.title;
                 duration.textContent = `Duration: ${data.duration}`;
-                thumbnail.src = data.thumbnail;
+                thumbnail.src = data.thumbnail || 'https://via.placeholder.com/80x48?text=No+Thumbnail';
                 videoInfo.classList.remove('hidden');
             } catch (e) {
-                urlError.textContent = 'Failed to fetch video info';
+                urlError.textContent = 'Failed to fetch video info. Please check the URL or try again later.';
                 urlError.classList.remove('hidden');
             }
         });
@@ -115,14 +110,13 @@
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             if (downloadBtn.disabled) return;
-
             downloadBtn.disabled = true;
             downloadBtn.innerHTML = '<svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span>Processing...</span>';
             statusText.textContent = 'Starting download...';
+            statusText.classList.remove('error', 'success');
             progressSection.classList.remove('hidden');
             progressBar.style.width = '0%';
             progressText.textContent = '0%';
-
             try {
                 const formData = new FormData(form);
                 const format = formData.get('format');
@@ -131,7 +125,6 @@
                 if (!res.ok || data.error) {
                     throw new Error(data.error || 'Failed to start download');
                 }
-
                 const sessionId = data.session_id;
                 const interval = setInterval(async () => {
                     try {
@@ -140,38 +133,45 @@
                         if (data.error) {
                             throw new Error(data.error);
                         }
-
                         progressBar.style.width = `${data.percentage}%`;
                         progressBar.setAttribute('aria-valuenow', data.percentage);
                         progressText.textContent = `${Math.round(data.percentage)}%`;
                         statusText.textContent = data.status || 'Processing...';
-
                         if (data.status === 'Downloaded') {
                             clearInterval(interval);
-                            statusText.textContent = 'Download complete. Saving file...';
+                            statusText.textContent = 'Download complete! Saving file...';
+                            statusText.classList.add('success');
                             window.location.href = `/download_file?session_id=${sessionId}&format=${format}`;
                             setTimeout(() => {
                                 downloadBtn.disabled = false;
-                                downloadBtn.innerHTML = '<span>Start Download</span>';
+                                downloadBtn.innerHTML = '<span>Download</span>';
                                 progressSection.classList.add('hidden');
                                 statusText.textContent = '';
-                            }, 3000);
+                            }, 2000);
+                        } else if (data.status === 'Error') {
+                            throw new Error(data.error || 'Download failed');
                         }
                     } catch (e) {
                         clearInterval(interval);
                         statusText.classList.add('error');
                         statusText.textContent = `Error: ${e.message}`;
                         downloadBtn.disabled = false;
-                        downloadBtn.innerHTML = '<span>Start Download</span>';
-                        setTimeout(() => progressSection.classList.add('hidden'), 3000);
+                        downloadBtn.innerHTML = '<span>Download</span>';
+                        setTimeout(() => {
+                            progressSection.classList.add('hidden');
+                            statusText.textContent = '';
+                        }, 3000);
                     }
                 }, 1000);
             } catch (e) {
                 statusText.classList.add('error');
                 statusText.textContent = `Error: ${e.message}`;
                 downloadBtn.disabled = false;
-                downloadBtn.innerHTML = '<span>Start Download</span>';
-                setTimeout(() => progressSection.classList.add('hidden'), 3000);
+                downloadBtn.innerHTML = '<span>Download</span>';
+                setTimeout(() => {
+                    progressSection.classList.add('hidden');
+                    statusText.textContent = '';
+                }, 3000);
             }
         });
     </script>
