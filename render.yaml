@@ -2,7 +2,13 @@ services:
   - type: web
     name: youtube-downloader
     env: python
+    plan: free
     buildCommand: |
       apt-get update && apt-get install -y ffmpeg
       pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    startCommand: gunicorn main:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10
+      - key: COOKIES_DATA
+        sync: false  # Set this manually in Render dashboard if needed
