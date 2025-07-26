@@ -3,8 +3,6 @@ import yt_dlp
 import os
 import ssl
 import threading
-import time
-import glob
 import logging
 
 app = Flask(__name__)
@@ -12,6 +10,15 @@ ssl._create_default_https_context = ssl._create_unverified_context
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
+
+# Create cookies.txt from environment variable if exists
+cookie_data = os.getenv('COOKIES_DATA')
+if cookie_data:
+    with open('cookies.txt', 'w') as f:
+        f.write(cookie_data)
+    app.logger.info("cookies.txt created from environment variable COOKIES_DATA.")
+else:
+    app.logger.warning("Environment variable COOKIES_DATA not found. Proceeding without cookies.txt.")
 
 # Track download progress
 download_progress = {"percentage": 0, "status": "", "error": "", "title": ""}
@@ -48,7 +55,7 @@ def download():
     if os.path.exists(output_file):
         os.remove(output_file)
 
-    # yt-dlp options
+    cookie_path = os.path.join(os.getcwd(), 'cookies.txt')
     options = {
         'outtmpl': output_file,
         'noplaylist': True,
@@ -57,6 +64,10 @@ def download():
         'no_warnings': True,
         'ffmpeg_location': '/usr/bin/ffmpeg',
     }
+
+    # Use cookies only if cookies.txt exists
+    if os.path.exists(cookie_path):
+        options['cookies'] = cookie_path
 
     if format_type == 'mp4':
         options['format'] = f'bestvideo[height<={resolution}]+bestaudio/best[height<={resolution}]'
@@ -74,8 +85,10 @@ def download():
             with yt_dlp.YoutubeDL(options) as ydl:
                 info = ydl.extract_info(url, download=True)
                 download_progress['title'] = info.get('title', 'Downloaded File')
+                download_progress['status'] = 'Downloaded'
         except Exception as e:
             download_progress['error'] = str(e)
+            download_progress['status'] = 'Error'
 
     threading.Thread(target=download_thread, daemon=True).start()
     return jsonify({"status": "started"}), 200
