@@ -10,7 +10,7 @@ from threading import Thread
 import shutil
 import ffmpeg
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static')
 CORS(app)
 
 # Configure logging
@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 progress_store = {}
 
 def clean_youtube_url(url):
-    """Remove playlist and other parameters from YouTube URL, keeping only video ID."""
+    """Remove playlist and other parameters from YouTube URL."""
     match = re.match(r'(https?://(?:www\.)?(?:youtube\.com/watch\?v=|youtu\.be/)([a-zA-Z0-9_-]{11}))', url)
     if match:
         return f"https://www.youtube.com/watch?v={match.group(2)}"
@@ -69,7 +69,7 @@ def video_info():
             return jsonify({
                 "title": info.get('title', 'Unknown Title'),
                 "duration": duration,
-                "thumbnail": info.get('thumbnail', '') or 'https://via.placeholder.com/80x48?text=No+Thumbnail'
+                "thumbnail": info.get('thumbnail', '') or ''
             })
     except yt_dlp.utils.DownloadError as e:
         logging.error(f"Video info error for {url}: {str(e)}")
@@ -193,7 +193,6 @@ def download_file():
             if os.path.exists(path):
                 os.remove(path)
                 logging.info(f"Cleaned up file: {path}")
-                # Clean up progress_store
                 progress_store.pop(session_id, None)
         Thread(target=cleanup_file, args=(file_path,), daemon=True).start()
         logging.info(f"Serving file: {file_path}")
@@ -204,4 +203,5 @@ def download_file():
 
 if __name__ == '__main__':
     os.makedirs('downloads', exist_ok=True)
-    app.run(debug=False, host='0.0.0.0', port=5000)
+    port = int(os.getenv('PORT', 5000))  # Use Render's PORT env var
+    app.run(debug=False, host='0.0.0.0', port=port)
