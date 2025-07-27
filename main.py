@@ -5,15 +5,16 @@ import re
 from flask import Flask, request, jsonify, send_file, render_template
 from flask_cors import CORS
 import yt_dlp
-import ssl
 from datetime import timedelta
 from threading import Thread
+import shutil
+import ffmpeg
 
 app = Flask(__name__)
 CORS(app)
 
+# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-ssl._create_default_https_context = ssl._create_unverified_context
 progress_store = {}
 
 def clean_youtube_url(url):
@@ -55,25 +56,27 @@ def video_info():
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
-            'cookies': 'cookies.txt' if os.path.exists('cookies.txt') else None,
-            'format': 'bestvideo[height<=720]+bestaudio/best',  # Inspired by reference code
+            'format': 'bestvideo[height<=720]+bestaudio/best',
+            'cookiefile': 'cookies.txt' if os.path.exists('cookies.txt') else None,
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(cleaned_url, download=False)
             if not info or info.get('is_private') or info.get('availability') == 'private':
-                return jsonify({"error": "This video is unavailable, private, or restricted. Try a different video or enable cookies for restricted content."}), 400
+                return jsonify({
+                    "error": "This video is unavailable, private, or restricted. Try a different video or check if cookies are required."
+                }), 400
             duration = str(timedelta(seconds=int(info.get('duration', 0))))
             return jsonify({
                 "title": info.get('title', 'Unknown Title'),
                 "duration": duration,
-                "thumbnail": info.get('thumbnail', '')
+                "thumbnail": info.get('thumbnail', '') or 'https://via.placeholder.com/80x48?text=No+Thumbnail'
             })
     except yt_dlp.utils.DownloadError as e:
         logging.error(f"Video info error for {url}: {str(e)}")
         return jsonify({"error": f"Video is unavailable or restricted: {str(e)}"}), 400
     except Exception as e:
         logging.error(f"Unexpected error in /video_info for {url}: {str(e)}")
-        return jsonify({"error": f"Failed to fetch video info: {str(e)}"}), 500
+        return jsonify({"error": "Failed to fetch video info. Please try again later."}), 500
 
 @app.route('/download', methods=['POST'])
 def download():
@@ -90,22 +93,23 @@ def download():
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
-            'cookies': 'cookies.txt' if os.path.exists('cookies.txt') else None,
-            'format': f'bestvideo[height<={resolution}]+bestaudio/best',  # Adapted from reference code
+            'cookiefile': 'cookies.txt' if os.path.exists('cookies.txt') else None,
+            'format': f'bestvideo[height<={resolution}]+bestaudio/best',
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(cleaned_url, download=False)
             if not info or info.get('is_private') or info.get('availability') == 'private':
                 progress_store[session_id]['error'] = 'Video is unavailable, private, or restricted'
-                return jsonify({"error": "This video is unavailable, private, or restricted. Try a different video or enable cookies for restricted content.", "session_id": session_id}), 400
+                return jsonify({
+                    "error": "This video is unavailable, private, or restricted. Try a different video or check if cookies are required.",
+                    "session_id": session_id
+                }), 400
             progress_store[session_id]['title'] = info.get('title', 'Downloaded File')
         cookies_data = os.getenv('COOKIES_DATA')
         if cookies_data:
             with open('cookies.txt', 'w') as f:
                 f.write(cookies_data)
             logging.info("Cookies data written to cookies.txt")
-        else:
-            logging.info("COOKIES_DATA not set; proceeding without cookies")
         output_file = f"downloads/{session_id}.{format_type}"
         os.makedirs('downloads', exist_ok=True)
         if os.path.exists(output_file):
@@ -116,13 +120,21 @@ def download():
             'progress_hooks': [lambda d: progress_hook(d, session_id)],
             'quiet': True,
             'no_warnings': True,
-            'ffmpeg_location': '/usr/bin/ffmpeg',  # Render-compatible path
-            'cookies': 'cookies.txt' if os.path.exists('cookies.txt') else None,
+            'cookiefile': 'cookies.txt' if os.path.exists('cookies.txt') else None,
         }
+        try:
+            ffmpeg_path = shutil.which('ffmpeg')
+            if not ffmpeg_path:
+                raise RuntimeError("FFmpeg not found in system PATH")
+            options['ffmpeg_location'] = ffmpeg_path
+        except Exception as e:
+            logging.error(f"FFmpeg error: {str(e)}")
+            progress_store[session_id]['error'] = 'FFmpeg is not installed or not found'
+            return jsonify({"error": "Server error: FFmpeg is not installed or not found", "session_id": session_id}), 500
         if format_type == 'mp4':
             options['format'] = f'bestvideo[height<={resolution}][ext=mp4]+bestaudio[ext=m4a]/best[height<={resolution}]'
             options['postprocessors'] = [{
-                'key': 'FFmpegVideoConvertor',  # From reference code
+                'key': 'FFmpegVideoConvertor',
                 'preferedformat': 'mp4',
             }]
         else:
@@ -181,7 +193,9 @@ def download_file():
             if os.path.exists(path):
                 os.remove(path)
                 logging.info(f"Cleaned up file: {path}")
-        Thread(target=cleanup_file, args=(file_path,)).start()
+                # Clean up progress_store
+                progress_store.pop(session_id, None)
+        Thread(target=cleanup_file, args=(file_path,), daemon=True).start()
         logging.info(f"Serving file: {file_path}")
         return response
     except Exception as e:
