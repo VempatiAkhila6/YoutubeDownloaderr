@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>YouTube Downloader</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
     <style>
         .error { color: #dc2626; }
         .success { color: #059669; }
@@ -14,7 +15,9 @@
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen font-sans">
     <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
-        <h1 class="text-2xl font-bold mb-4 text-center">YouTube Downloader</h1>
+        <h1 class="text-2xl font-bold mb-4 text-center flex items-center justify-center">
+            <i class="fas fa-download mr-2"></i> YouTube Downloader
+        </h1>
         <form id="download-form" class="space-y-4" aria-label="YouTube Download Form">
             <div>
                 <label for="url" class="block text-sm font-medium">YouTube URL</label>
@@ -22,7 +25,7 @@
                 <p id="url-error" class="text-sm error hidden mt-1" role="alert"></p>
             </div>
             <div id="video-info" class="hidden space-y-2 p-3 bg-gray-50 rounded">
-                <img id="thumbnail" src="" alt="Video thumbnail" class="w-20 h-12 object-cover rounded" />
+                <img id="thumbnail" src="" alt="Video thumbnail" class="w-20 h-12 object-cover rounded hidden" />
                 <p id="title" class="text-sm font-medium"></p>
                 <p id="duration" class="text-xs text-gray-500"></p>
             </div>
@@ -42,7 +45,7 @@
                 </select>
             </div>
             <button type="submit" id="download-btn" class="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700 disabled:bg-gray-400 flex items-center justify-center space-x-2" aria-label="Start download">
-                <span>Download</span>
+                <i class="fas fa-download"></i> <span>Download</span>
             </button>
         </form>
         <div id="progress-section" class="mt-4 hidden">
@@ -53,7 +56,7 @@
         </div>
         <p id="status" class="text-sm text-center mt-4 fade-in" role="alert"></p>
         <p class="text-xs text-gray-500 mt-4 text-center">
-            Use this tool responsibly. Ensure you have permission to download content. Comply with YouTube's <a href="https://www.youtube.com/t/terms" class="underline" target="_blank">Terms of Service</a>.
+            Use responsibly and comply with YouTube's <a href="https://www.youtube.com/t/terms" class="underline" target="_blank">Terms of Service</a>.
         </p>
     </div>
     <script>
@@ -80,6 +83,7 @@
             const url = urlInput.value.trim();
             urlError.classList.add('hidden');
             videoInfo.classList.add('hidden');
+            thumbnail.classList.add('hidden');
             if (!url || !/^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\//.test(url)) {
                 urlError.textContent = 'Please enter a valid YouTube URL (e.g., https://www.youtube.com/watch?v=...)';
                 urlError.classList.remove('hidden');
@@ -99,7 +103,10 @@
                 }
                 title.textContent = data.title;
                 duration.textContent = `Duration: ${data.duration}`;
-                thumbnail.src = data.thumbnail;
+                if (data.thumbnail) {
+                    thumbnail.src = data.thumbnail;
+                    thumbnail.classList.remove('hidden');
+                }
                 videoInfo.classList.remove('hidden');
             } catch (e) {
                 urlError.textContent = 'Failed to fetch video info. Please check the URL or try again later.';
@@ -111,7 +118,7 @@
             e.preventDefault();
             if (downloadBtn.disabled) return;
             downloadBtn.disabled = true;
-            downloadBtn.innerHTML = '<svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg><span>Processing...</span>';
+            downloadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Processing...</span>';
             statusText.textContent = 'Starting download...';
             statusText.classList.remove('error', 'success');
             progressSection.classList.remove('hidden');
@@ -144,7 +151,7 @@
                             window.location.href = `/download_file?session_id=${sessionId}&format=${format}`;
                             setTimeout(() => {
                                 downloadBtn.disabled = false;
-                                downloadBtn.innerHTML = '<span>Download</span>';
+                                downloadBtn.innerHTML = '<i class="fas fa-download"></i> <span>Download</span>';
                                 progressSection.classList.add('hidden');
                                 statusText.textContent = '';
                             }, 2000);
@@ -156,7 +163,7 @@
                         statusText.classList.add('error');
                         statusText.textContent = `Error: ${e.message}`;
                         downloadBtn.disabled = false;
-                        downloadBtn.innerHTML = '<span>Download</span>';
+                        downloadBtn.innerHTML = '<i class="fas fa-download"></i> <span>Download</span>';
                         setTimeout(() => {
                             progressSection.classList.add('hidden');
                             statusText.textContent = '';
@@ -167,7 +174,7 @@
                 statusText.classList.add('error');
                 statusText.textContent = `Error: ${e.message}`;
                 downloadBtn.disabled = false;
-                downloadBtn.innerHTML = '<span>Download</span>';
+                downloadBtn.innerHTML = '<i class="fas fa-download"></i> <span>Download</span>';
                 setTimeout(() => {
                     progressSection.classList.add('hidden');
                     statusText.textContent = '';
