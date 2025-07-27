@@ -1,4 +1,5 @@
 Flask==2.3.3
-yt-dlp==2024.10.7
+yt-dlp==2024.10.22  # Updated to a more recent version
 flask-cors==4.0.1
 gunicorn==22.0.0
+python-ffmpeg==2.0.2  # Added for better FFmpeg handling
