@@ -4,7 +4,6 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     DEBIAN_FRONTEND=noninteractive
 
-# Install dependencies
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     python3.10 \
