@@ -99,7 +99,7 @@
                 }
                 title.textContent = data.title;
                 duration.textContent = `Duration: ${data.duration}`;
-                thumbnail.src = data.thumbnail || 'https://via.placeholder.com/80x48?text=No+Thumbnail';
+                thumbnail.src = data.thumbnail;
                 videoInfo.classList.remove('hidden');
             } catch (e) {
                 urlError.textContent = 'Failed to fetch video info. Please check the URL or try again later.';
